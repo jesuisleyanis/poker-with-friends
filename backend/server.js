@@ -32,9 +32,9 @@ const TABLE = {
   currentPlayer: 0,
   phase: 'waiting', // waiting, preflop, flop, turn, river, showdown
   lastRaise: 0,
-  minRaise: 20,
-  smallBlind: 10,
   bigBlind: 20,
+  smallBlind: 10,
+  lastBettor: -1, // Index du dernier joueur ayant misé/relancé
 };
 
 const INITIAL_STACK = 1000;
@@ -58,6 +58,7 @@ wss.on('connection', (ws) => {
       ws.send(JSON.stringify({ type: 'error', message: 'Format JSON invalide' }));
       return;
     }
+
     if (data.type === 'join') {
       if (TABLE.players.find(p => p.pseudo === data.pseudo)) {
         ws.send(JSON.stringify({ type: 'error', message: 'Pseudo déjà pris' }));
@@ -66,13 +67,14 @@ wss.on('connection', (ws) => {
       TABLE.players.push({ ws, pseudo: data.pseudo, hand: [], stack: INITIAL_STACK, bet: 0, folded: false });
       broadcastTableState();
     }
-    if (data.type === 'start') {
-      if (!TABLE.started && TABLE.players.length >= 2) {
-        startGame();
-      }
+    if (data.type === 'start' && !TABLE.started && TABLE.players.length >= 2) {
+      startGame();
     }
     if (data.type === 'action') {
       handleAction(ws, data.action, data.amount);
+    }
+    if (data.type === 'stop') {
+      stopGame();
     }
   });
 });
@@ -83,98 +85,159 @@ function startGame() {
   TABLE.community = [];
   TABLE.pot = 0;
   TABLE.phase = 'preflop';
-  TABLE.dealerIndex = Math.floor(Math.random() * TABLE.players.length);
-  TABLE.currentPlayer = (TABLE.dealerIndex + 1 + 1) % TABLE.players.length; // Après big blind
   TABLE.lastRaise = TABLE.bigBlind;
-  // Reset joueurs
+  TABLE.lastBettor = -1;
+
+  // Distribuer les cartes et réinitialiser les états
   for (let i = 0; i < TABLE.players.length; i++) {
     const player = TABLE.players[i];
     player.hand = [TABLE.deck.pop(), TABLE.deck.pop()];
     player.bet = 0;
     player.folded = false;
   }
-  // Blinds
+
+  // Gérer le bouton et les blinds
+  TABLE.dealerIndex = Math.floor(Math.random() * TABLE.players.length);
   const sbIndex = (TABLE.dealerIndex + 1) % TABLE.players.length;
   const bbIndex = (TABLE.dealerIndex + 2) % TABLE.players.length;
+
+  // Prélever les blinds
   TABLE.players[sbIndex].stack -= TABLE.smallBlind;
   TABLE.players[sbIndex].bet = TABLE.smallBlind;
   TABLE.players[bbIndex].stack -= TABLE.bigBlind;
   TABLE.players[bbIndex].bet = TABLE.bigBlind;
   TABLE.pot = TABLE.smallBlind + TABLE.bigBlind;
+
+  // UTG (Under The Gun) commence
+  TABLE.currentPlayer = (TABLE.dealerIndex + 3) % TABLE.players.length;
   broadcastTableState();
   notifyCurrentPlayer();
 }
 
 function handleAction(ws, action, amount) {
-  const idx = TABLE.players.findIndex(p => p.ws === ws);
-  if (idx !== TABLE.currentPlayer) return; // Pas à toi de jouer
-  const player = TABLE.players[idx];
-  if (player.folded) return;
+  const playerIndex = TABLE.players.findIndex(p => p.ws === ws);
+  if (playerIndex !== TABLE.currentPlayer || TABLE.players[playerIndex].folded) return;
+
+  const player = TABLE.players[playerIndex];
+  const maxBet = Math.max(...TABLE.players.map(p => p.bet));
+  const minRaise = TABLE.phase === 'preflop' ? TABLE.bigBlind : TABLE.lastRaise;
+
   switch (action) {
     case 'fold':
       player.folded = true;
-      player.bet = 0;
       break;
+
     case 'call': {
-      const maxBet = Math.max(...TABLE.players.map(p => p.bet));
       const toCall = maxBet - player.bet;
-      if (player.stack >= toCall) {
-        player.stack -= toCall;
-        player.bet += toCall;
-        TABLE.pot += toCall;
+      if (toCall > 0) {
+        const actualCall = Math.min(toCall, player.stack);
+        player.stack -= actualCall;
+        player.bet += actualCall;
+        TABLE.pot += actualCall;
       }
       break;
     }
-    case 'check': {
-      const maxBet = Math.max(...TABLE.players.map(p => p.bet));
-      if (player.bet !== maxBet) return; // Impossible de check si on n'a pas misé autant
+
+    case 'check':
+      if (player.bet !== maxBet) return;
       break;
-    }
+
     case 'raise': {
-      const maxBet = Math.max(...TABLE.players.map(p => p.bet));
       const toCall = maxBet - player.bet;
-      if (amount < TABLE.minRaise) return;
-      if (player.stack >= toCall + amount) {
-        player.stack -= (toCall + amount);
-        player.bet += (toCall + amount);
-        TABLE.pot += (toCall + amount);
-        TABLE.lastRaise = amount;
-      }
+      if (amount < minRaise || player.stack < (toCall + amount)) return;
+      
+      player.stack -= (toCall + amount);
+      player.bet += (toCall + amount);
+      TABLE.pot += (toCall + amount);
+      TABLE.lastRaise = amount;
+      TABLE.lastBettor = playerIndex;
       break;
     }
+
     default:
       return;
   }
-  nextPlayer();
+
+  // Passer au joueur suivant
+  nextTurn();
 }
 
-function nextPlayer() {
-  // Trouver le prochain joueur actif
-  let next = TABLE.currentPlayer;
-  let found = false;
-  for (let i = 1; i <= TABLE.players.length; i++) {
-    const idx = (TABLE.currentPlayer + i) % TABLE.players.length;
-    if (!TABLE.players[idx].folded && TABLE.players[idx].stack > 0) {
-      next = idx;
-      found = true;
-      break;
-    }
-  }
-  TABLE.currentPlayer = next;
-  // Vérifier si le tour est fini
-  if (isBettingRoundOver()) {
+function nextTurn() {
+  if (isRoundComplete()) {
     advancePhase();
-  } else {
-    broadcastTableState();
-    notifyCurrentPlayer();
+    return;
   }
+
+  do {
+    TABLE.currentPlayer = (TABLE.currentPlayer + 1) % TABLE.players.length;
+  } while (
+    TABLE.players[TABLE.currentPlayer].folded || 
+    TABLE.players[TABLE.currentPlayer].stack === 0
+  );
+
+  broadcastTableState();
+  notifyCurrentPlayer();
 }
 
-function isBettingRoundOver() {
-  const active = TABLE.players.filter(p => !p.folded && p.stack > 0);
-  if (active.length <= 1) return true; // Plus qu'un joueur
+function isRoundComplete() {
+  const activePlayers = TABLE.players.filter(p => !p.folded && p.stack > 0);
+  if (activePlayers.length <= 1) return true;
+
   const maxBet = Math.max(...TABLE.players.map(p => p.bet));
-  return active.every(p => p.bet === maxBet);
+  const allBetsEqual = activePlayers.every(p => p.bet === maxBet || p.stack === 0);
+  const everyoneHadTurn = TABLE.lastBettor === -1 || 
+    TABLE.currentPlayer === TABLE.lastBettor || 
+    TABLE.players[TABLE.currentPlayer].bet === maxBet;
+
+  return allBetsEqual && everyoneHadTurn;
+}
+
+function advancePhase() {
+  // Reset des mises pour le nouveau tour
+  TABLE.lastBettor = -1;
+  for (const p of TABLE.players) p.bet = 0;
+
+  if (TABLE.phase === 'preflop') {
+    TABLE.community = [TABLE.deck.pop(), TABLE.deck.pop(), TABLE.deck.pop()];
+    TABLE.phase = 'flop';
+  } else if (TABLE.phase === 'flop') {
+    TABLE.community.push(TABLE.deck.pop());
+    TABLE.phase = 'turn';
+  } else if (TABLE.phase === 'turn') {
+    TABLE.community.push(TABLE.deck.pop());
+    TABLE.phase = 'river';
+  } else if (TABLE.phase === 'river') {
+    TABLE.phase = 'showdown';
+    showdown();
+    return;
+  }
+
+  // Premier joueur actif après le dealer
+  TABLE.currentPlayer = getNextActivePlayer(TABLE.dealerIndex);
+  broadcastTableState();
+  notifyCurrentPlayer();
+}
+
+function getNextActivePlayer(fromIndex) {
+  for (let i = 1; i <= TABLE.players.length; i++) {
+    const idx = (fromIndex + i) % TABLE.players.length;
+    if (!TABLE.players[idx].folded && TABLE.players[idx].stack > 0) return idx;
+  }
+  return fromIndex;
+}
+
+function stopGame() {
+  TABLE.started = false;
+  TABLE.phase = 'waiting';
+  TABLE.community = [];
+  TABLE.pot = 0;
+  TABLE.lastBettor = -1;
+  for (const p of TABLE.players) {
+    p.hand = [];
+    p.bet = 0;
+    p.folded = false;
+  }
+  broadcastTableState();
 }
 
 function getHandRank(cards) {
@@ -340,37 +403,6 @@ function newHand() {
   notifyCurrentPlayer();
 }
 
-// Remplacer advancePhase pour appeler showdown
-function advancePhase() {
-  for (const p of TABLE.players) p.bet = 0;
-  if (TABLE.phase === 'preflop') {
-    TABLE.community = [TABLE.deck.pop(), TABLE.deck.pop(), TABLE.deck.pop()];
-    TABLE.phase = 'flop';
-  } else if (TABLE.phase === 'flop') {
-    TABLE.community.push(TABLE.deck.pop());
-    TABLE.phase = 'turn';
-  } else if (TABLE.phase === 'turn') {
-    TABLE.community.push(TABLE.deck.pop());
-    TABLE.phase = 'river';
-  } else if (TABLE.phase === 'river') {
-    TABLE.phase = 'showdown';
-    showdown();
-    return;
-  }
-  broadcastTableState();
-  if (TABLE.phase !== 'showdown') {
-    TABLE.currentPlayer = getFirstActivePlayer();
-    notifyCurrentPlayer();
-  }
-}
-
-function getFirstActivePlayer() {
-  for (let i = 0; i < TABLE.players.length; i++) {
-    if (!TABLE.players[i].folded && TABLE.players[i].stack > 0) return i;
-  }
-  return 0;
-}
-
 function notifyCurrentPlayer() {
   const player = TABLE.players[TABLE.currentPlayer];
   if (player) {
@@ -381,14 +413,22 @@ function notifyCurrentPlayer() {
 function broadcastTableState() {
   const state = {
     type: 'state',
-    players: TABLE.players.map(p => ({ pseudo: p.pseudo, stack: p.stack, bet: p.bet, folded: p.folded })),
+    players: TABLE.players.map(p => ({ 
+      pseudo: p.pseudo, 
+      stack: p.stack, 
+      bet: p.bet, 
+      folded: p.folded 
+    })),
     started: TABLE.started,
     community: TABLE.community,
     pot: TABLE.pot,
     phase: TABLE.phase,
     dealerIndex: TABLE.dealerIndex,
     currentPlayer: TABLE.currentPlayer,
+    lastRaise: TABLE.lastRaise,
+    bigBlind: TABLE.bigBlind
   };
+
   for (const player of TABLE.players) {
     player.ws.send(JSON.stringify({
       ...state,
