@@ -1,1 +1,96 @@
 @import "tailwindcss";
+
+body {
+  background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+  color: #f1f5f9;
+  min-height: 100vh;
+}
+
+.card {
+  @apply relative w-20 h-28 rounded-xl shadow-lg transition-all duration-300 transform hover:scale-105 bg-white;
+}
+
+.card-back {
+  @apply bg-indigo-600;
+  background-image: 
+    linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+
+.btn {
+  @apply px-6 py-3 rounded-xl font-semibold transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-primary {
+  @apply bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg hover:shadow-indigo-500/50;
+}
+
+.btn-action {
+  @apply px-4 py-2 rounded-lg font-medium transition-all duration-200;
+}
+
+.btn-fold {
+  @apply bg-red-500 text-white hover:bg-red-600 shadow-md hover:shadow-red-500/50;
+}
+
+.btn-check {
+  @apply bg-violet-500 text-white hover:bg-violet-600 shadow-md hover:shadow-violet-500/50;
+}
+
+.btn-call {
+  @apply bg-emerald-500 text-white hover:bg-emerald-600 shadow-md hover:shadow-emerald-500/50;
+}
+
+.btn-raise {
+  @apply bg-pink-500 text-white hover:bg-pink-600 shadow-md hover:shadow-pink-500/50;
+}
+
+.player-box {
+  @apply relative px-6 py-4 rounded-2xl backdrop-blur-sm bg-slate-800/30 shadow-xl transition-all duration-300 border border-white/10;
+}
+
+.player-box-active {
+  @apply ring-2 ring-indigo-500 bg-slate-700/50;
+}
+
+.player-box-inactive {
+  @apply opacity-75;
+}
+
+.player-box-folded {
+  @apply opacity-50 grayscale;
+}
+
+.input-primary {
+  @apply px-4 py-2 bg-slate-800/50 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200;
+}
+
+.table-felt {
+  @apply relative p-12 rounded-[8rem] shadow-2xl border-8;
+  background: linear-gradient(145deg, #2c6e31, #1a4b1d);
+  border-color: #2d1810;
+}
+
+.chip {
+  @apply inline-flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm;
+  background: linear-gradient(145deg, #ffd700, #ffa500);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.dealer-button {
+  @apply absolute -top-3 -right-3 w-8 h-8 rounded-full bg-indigo-500 text-white flex items-center justify-center font-bold text-sm shadow-lg;
+}
+
+.animate-pulse-border {
+  animation: pulse-border 2s infinite;
+}
+
+@keyframes pulse-border {
+  0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+  70% { box-shadow: 0 0 0 10px rgba(99, 102, 241, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+}
