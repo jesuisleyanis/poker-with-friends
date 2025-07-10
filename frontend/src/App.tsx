@@ -24,9 +24,7 @@ type Message =
   | { type: 'showdown'; winners: string[]; best: string; hand: any[]; yourBest: string | null; pot: number }
   | { type: 'error'; message: string };
 
-const WS_URL = window.location.hostname === 'localhost'
-  ? 'ws://localhost:8080'
-  : 'ws://' + window.location.hostname + ':8080';
+  const WS_URL = `ws://${import.meta.env.VITE_BACKEND_HOST}:${import.meta.env.VITE_BACKEND_PORT}`;
 
 export default function App() {
   const [pseudo, setPseudo] = useState('');
