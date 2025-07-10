@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import useWebSocket from 'react-use-websocket';
 
-const WS_URL = 'ws://localhost:8080';
+const WS_URL = `ws://${import.meta.env.VITE_BACKEND_HOST}:${import.meta.env.VITE_BACKEND_PORT}`;
 
 function App() {
   const [pseudo, setPseudo] = useState('');
