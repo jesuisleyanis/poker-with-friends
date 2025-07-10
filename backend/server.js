@@ -23,7 +23,7 @@ function shuffle(deck) {
 
 // --- Gestion des tables et joueurs ---
 const TABLE = {
-  players: [], // { ws, pseudo, hand, stack, bet, folded }
+  players: [], // { ws, pseudo, hand, stack, bet, folded, hasActed }
   deck: [],
   community: [],
   started: false,
@@ -64,7 +64,15 @@ wss.on('connection', (ws) => {
         ws.send(JSON.stringify({ type: 'error', message: 'Pseudo déjà pris' }));
         return;
       }
-      TABLE.players.push({ ws, pseudo: data.pseudo, hand: [], stack: INITIAL_STACK, bet: 0, folded: false });
+      TABLE.players.push({ 
+        ws, 
+        pseudo: data.pseudo, 
+        hand: [], 
+        stack: INITIAL_STACK, 
+        bet: 0, 
+        folded: false,
+        hasActed: false
+      });
       broadcastTableState();
     }
     if (data.type === 'start' && !TABLE.started && TABLE.players.length >= 2) {
@@ -94,6 +102,7 @@ function startGame() {
     player.hand = [TABLE.deck.pop(), TABLE.deck.pop()];
     player.bet = 0;
     player.folded = false;
+    player.hasActed = false;
   }
 
   // Gérer le bouton et les blinds
@@ -107,6 +116,10 @@ function startGame() {
   TABLE.players[bbIndex].stack -= TABLE.bigBlind;
   TABLE.players[bbIndex].bet = TABLE.bigBlind;
   TABLE.pot = TABLE.smallBlind + TABLE.bigBlind;
+
+  // En preflop, seule la petite blinde a "agi", la grosse blinde doit pouvoir agir
+  TABLE.players[sbIndex].hasActed = true;
+  TABLE.players[bbIndex].hasActed = false; // BB peut encore agir
 
   // UTG (Under The Gun) commence
   TABLE.currentPlayer = (TABLE.dealerIndex + 3) % TABLE.players.length;
@@ -151,12 +164,22 @@ function handleAction(ws, action, amount) {
       TABLE.pot += (toCall + amount);
       TABLE.lastRaise = amount;
       TABLE.lastBettor = playerIndex;
+      
+      // Réinitialiser hasActed pour tous les autres joueurs actifs
+      for (let i = 0; i < TABLE.players.length; i++) {
+        if (i !== playerIndex && !TABLE.players[i].folded && TABLE.players[i].stack > 0) {
+          TABLE.players[i].hasActed = false;
+        }
+      }
       break;
     }
 
     default:
       return;
   }
+
+  // Marquer le joueur comme ayant agi
+  player.hasActed = true;
 
   // Passer au joueur suivant
   nextTurn();
@@ -188,16 +211,13 @@ function isRoundComplete() {
   const maxBet = Math.max(...TABLE.players.map(p => p.bet));
   const allBetsEqual = activePlayers.every(p => p.bet === maxBet || p.stack === 0);
   
-  // Si tous les joueurs actifs ont misé le même montant, vérifier que tout le monde a eu son tour
-  if (allBetsEqual) {
-    // Si personne n'a relancé, le tour est terminé
-    if (TABLE.lastBettor === -1) return true;
-    
-    // Sinon, vérifier que le dernier relanceur a eu son tour
-    return TABLE.currentPlayer === TABLE.lastBettor;
-  }
+  // Si tous les joueurs actifs n'ont pas misé le même montant, le tour continue
+  if (!allBetsEqual) return false;
   
-  return false;
+  // Vérifier que tous les joueurs actifs ont agi
+  const allPlayersActed = activePlayers.every(p => p.hasActed);
+  
+  return allPlayersActed;
 }
 
 function advancePhase() {
@@ -223,9 +243,12 @@ function advancePhase() {
     return;
   }
 
-  // Reset des mises pour le nouveau tour
+  // Reset des mises et actions pour le nouveau tour
   TABLE.lastBettor = -1;
-  for (const p of TABLE.players) p.bet = 0;
+  for (const p of TABLE.players) {
+    p.bet = 0;
+    p.hasActed = false;
+  }
 
   if (TABLE.phase === 'preflop') {
     TABLE.community = [TABLE.deck.pop(), TABLE.deck.pop(), TABLE.deck.pop()];
@@ -266,6 +289,7 @@ function stopGame() {
     p.hand = [];
     p.bet = 0;
     p.folded = false;
+    p.hasActed = false;
   }
   broadcastTableState();
 }
@@ -400,35 +424,42 @@ function newHand() {
   TABLE.pot = 0;
   TABLE.phase = 'preflop';
   TABLE.lastRaise = TABLE.bigBlind;
-  // Distribuer les mains
+  TABLE.lastBettor = -1;
+  
+  // Distribuer les mains et réinitialiser les états
   for (let i = 0; i < TABLE.players.length; i++) {
     const player = TABLE.players[i];
     if (player.stack>0) {
       player.hand = [TABLE.deck.pop(), TABLE.deck.pop()];
       player.bet = 0;
       player.folded = false;
+      player.hasActed = false;
     } else {
       player.hand = [];
       player.folded = true;
+      player.hasActed = false;
     }
   }
+  
   // Blinds
   const sbIndex = (TABLE.dealerIndex + 1) % TABLE.players.length;
   const bbIndex = (TABLE.dealerIndex + 2) % TABLE.players.length;
   if (TABLE.players[sbIndex].stack>=TABLE.smallBlind) {
     TABLE.players[sbIndex].stack -= TABLE.smallBlind;
     TABLE.players[sbIndex].bet = TABLE.smallBlind;
+    TABLE.players[sbIndex].hasActed = true;
   } else {
     TABLE.players[sbIndex].bet = 0;
   }
   if (TABLE.players[bbIndex].stack>=TABLE.bigBlind) {
     TABLE.players[bbIndex].stack -= TABLE.bigBlind;
     TABLE.players[bbIndex].bet = TABLE.bigBlind;
+    TABLE.players[bbIndex].hasActed = false; // BB peut encore agir en preflop
   } else {
     TABLE.players[bbIndex].bet = 0;
   }
   TABLE.pot = (TABLE.players[sbIndex].bet||0) + (TABLE.players[bbIndex].bet||0);
-  TABLE.currentPlayer = (TABLE.dealerIndex + 1 + 1) % TABLE.players.length;
+  TABLE.currentPlayer = (TABLE.dealerIndex + 3) % TABLE.players.length;
   broadcastTableState();
   notifyCurrentPlayer();
 }

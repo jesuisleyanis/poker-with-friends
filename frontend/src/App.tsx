@@ -9,6 +9,7 @@ function App() {
   const [raiseAmount, setRaiseAmount] = useState(20);
   const [gameState, setGameState] = useState<any>(null);
   const [showdown, setShowdown] = useState<any>(null);
+  const [showWinner, setShowWinner] = useState(false);
   const { sendMessage, lastMessage } = useWebSocket(WS_URL);
 
   useEffect(() => {
@@ -17,8 +18,12 @@ function App() {
       if (data.type === 'state') {
         setGameState(data);
         setShowdown(null);
+        setShowWinner(false);
       } else if (data.type === 'showdown') {
         setShowdown(data);
+        setShowWinner(true);
+        // Masquer automatiquement après 3 secondes
+        setTimeout(() => setShowWinner(false), 3000);
       }
     }
   }, [lastMessage]);
@@ -189,32 +194,21 @@ function App() {
             </div>
           )}
 
-          {/* Showdown */}
-          {showdown && (
-            <div className="fixed inset-0 bg-black/80 flex items-center justify-center">
-              <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl max-w-lg w-full mx-4 border border-white/10">
-                <h2 className="text-2xl font-bold mb-4 text-center">Fin de la main</h2>
-                <p className="text-center mb-4">
-                  {showdown.winners.length > 1 ? 'Les gagnants sont ' : 'Le gagnant est '}
-                  <span className="font-bold text-indigo-400">{showdown.winners.join(' et ')}</span>
-                </p>
-                <p className="text-center mb-4">
-                  Avec {showdown.best}
-                </p>
-                {showdown.hand && (
-                  <div className="flex justify-center gap-2 mb-4">
-                    {showdown.hand.map((card: any, i: number) => (
-                      <div key={i} className="card flex items-center justify-center text-xl">
-                        <span className={card.suit === '♥' || card.suit === '♦' ? 'text-red-500' : 'text-gray-900'}>
-                          {card.rank}{card.suit}
-                        </span>
-                      </div>
-                    ))}
+          {/* Notification du gagnant */}
+          {showWinner && showdown && (
+            <div className="fixed top-6 left-1/2 transform -translate-x-1/2 z-50 winner-notification">
+              <div className="bg-gradient-to-r from-emerald-600 to-emerald-700 text-white px-8 py-4 rounded-2xl shadow-2xl border border-emerald-500/30 backdrop-blur-sm animate-pulse-border">
+                <div className="text-center">
+                  <div className="text-2xl font-bold mb-2">
+                    🎉 {showdown.winners.length > 1 ? 'Gagnants' : 'Gagnant'} 🎉
                   </div>
-                )}
-                <p className="text-center text-gray-400">
-                  Pot : {showdown.pot} jetons
-                </p>
+                  <div className="text-lg font-semibold mb-1">
+                    {showdown.winners.join(' et ')}
+                  </div>
+                  <div className="text-sm opacity-90">
+                    {showdown.best} • {showdown.pot} jetons
+                  </div>
+                </div>
               </div>
             </div>
           )}
