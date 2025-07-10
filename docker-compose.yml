@@ -1,8 +1,8 @@
 services:
   backend:
     build: ./backend
-    ports:
-      - '8081:8080'
+    expose:
+      - '8080'
     restart: unless-stopped
     mem_limit: 512m
     cpus: 0.5
@@ -10,9 +10,9 @@ services:
   frontend:
     build: ./frontend
     ports:
-      - '80:80'
+      - '9000:80'
     depends_on:
       - backend
-    restart: unless-stopped 
+    restart: unless-stopped
     mem_limit: 512m
     cpus: 0.5
