@@ -26,7 +26,7 @@ body {
 }
 
 .btn-primary {
-  @apply bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg hover:shadow-indigo-500/50;
+  @apply bg-indigo-500 text-white hover:bg-indigo-600 shadow-lg;
 }
 
 .btn-action {
@@ -34,19 +34,19 @@ body {
 }
 
 .btn-fold {
-  @apply bg-red-500 text-white hover:bg-red-600 shadow-md hover:shadow-red-500/50;
+  @apply bg-red-500 text-white hover:bg-red-600 shadow-md;
 }
 
 .btn-check {
-  @apply bg-violet-500 text-white hover:bg-violet-600 shadow-md hover:shadow-violet-500/50;
+  @apply bg-violet-500 text-white hover:bg-violet-600 shadow-md;
 }
 
 .btn-call {
-  @apply bg-emerald-500 text-white hover:bg-emerald-600 shadow-md hover:shadow-emerald-500/50;
+  @apply bg-emerald-500 text-white hover:bg-emerald-600 shadow-md;
 }
 
 .btn-raise {
-  @apply bg-pink-500 text-white hover:bg-pink-600 shadow-md hover:shadow-pink-500/50;
+  @apply bg-pink-500 text-white hover:bg-pink-600 shadow-md;
 }
 
 .player-box {

@@ -181,18 +181,48 @@ function nextTurn() {
 
 function isRoundComplete() {
   const activePlayers = TABLE.players.filter(p => !p.folded && p.stack > 0);
+  
+  // Si il ne reste qu'un seul joueur actif, la main est terminée
   if (activePlayers.length <= 1) return true;
 
   const maxBet = Math.max(...TABLE.players.map(p => p.bet));
   const allBetsEqual = activePlayers.every(p => p.bet === maxBet || p.stack === 0);
-  const everyoneHadTurn = TABLE.lastBettor === -1 || 
-    TABLE.currentPlayer === TABLE.lastBettor || 
-    TABLE.players[TABLE.currentPlayer].bet === maxBet;
-
-  return allBetsEqual && everyoneHadTurn;
+  
+  // Si tous les joueurs actifs ont misé le même montant, vérifier que tout le monde a eu son tour
+  if (allBetsEqual) {
+    // Si personne n'a relancé, le tour est terminé
+    if (TABLE.lastBettor === -1) return true;
+    
+    // Sinon, vérifier que le dernier relanceur a eu son tour
+    return TABLE.currentPlayer === TABLE.lastBettor;
+  }
+  
+  return false;
 }
 
 function advancePhase() {
+  // Vérifier s'il ne reste qu'un seul joueur actif
+  const activePlayers = TABLE.players.filter(p => !p.folded && p.stack > 0);
+  if (activePlayers.length <= 1) {
+    // Le dernier joueur actif remporte le pot
+    if (activePlayers.length === 1) {
+      activePlayers[0].stack += TABLE.pot;
+      // Notifier le gagnant
+      for (const p of TABLE.players) {
+        p.ws.send(JSON.stringify({
+          type: 'showdown',
+          winners: [activePlayers[0].pseudo],
+          best: 'Seul joueur actif',
+          hand: p.hand,
+          yourBest: p.pseudo === activePlayers[0].pseudo ? 'Seul joueur actif' : null,
+          pot: TABLE.pot,
+        }));
+      }
+    }
+    setTimeout(newHand, 2000);
+    return;
+  }
+
   // Reset des mises pour le nouveau tour
   TABLE.lastBettor = -1;
   for (const p of TABLE.players) p.bet = 0;
