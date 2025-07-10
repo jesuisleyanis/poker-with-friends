@@ -34,7 +34,7 @@ body {
 }
 
 .btn-fold {
-  @apply bg-red-500 text-white hover:bg-red-600 shadow-md;
+  @apply bg-pink-500 text-white hover:bg-pink-600 shadow-md;
 }
 
 .btn-check {
@@ -46,7 +46,11 @@ body {
 }
 
 .btn-raise {
-  @apply bg-pink-500 text-white hover:bg-pink-600 shadow-md;
+  @apply bg-orange-500 text-white hover:bg-orange-600 shadow-md;
+}
+
+.btn-allin {
+  @apply bg-red-600 text-white hover:bg-red-700 shadow-md font-bold;
 }
 
 .player-box {
@@ -65,6 +69,43 @@ body {
   @apply opacity-50 grayscale;
 }
 
+.player-box-allin {
+  @apply ring-2 ring-red-500 bg-red-900/20;
+}
+
+.player-box-winner {
+  @apply ring-2 ring-yellow-400 bg-yellow-900/20;
+}
+
+.card-revealed {
+  @apply ring-2 ring-blue-400 shadow-lg transform scale-105;
+  animation: reveal 0.5s ease-out;
+}
+
+@keyframes reveal {
+  from {
+    opacity: 0;
+    transform: scale(0.8) rotateY(180deg);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.05) rotateY(0deg);
+  }
+}
+
+.winner-glow {
+  animation: winner-glow 2s ease-in-out infinite alternate;
+}
+
+@keyframes winner-glow {
+  from {
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+  }
+  to {
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.8);
+  }
+}
+
 .input-primary {
   @apply px-4 py-2 bg-slate-800/50 border border-gray-600 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-200;
 }
@@ -79,6 +120,7 @@ body {
   @apply inline-flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm;
   background: linear-gradient(145deg, #ffd700, #ffa500);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  color: #1a1a1a;
 }
 
 .dealer-button {
