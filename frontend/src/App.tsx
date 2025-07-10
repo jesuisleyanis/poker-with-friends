@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface Player {
   pseudo: string;
@@ -24,7 +24,9 @@ type Message =
   | { type: 'showdown'; winners: string[]; best: string; hand: any[]; yourBest: string | null; pot: number }
   | { type: 'error'; message: string };
 
-const WS_URL = 'ws://localhost:8080';
+const WS_URL = window.location.hostname === 'localhost'
+  ? 'ws://localhost:8080'
+  : 'ws://' + window.location.hostname + ':8080';
 
 export default function App() {
   const [pseudo, setPseudo] = useState('');
