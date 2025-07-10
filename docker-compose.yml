@@ -1,11 +1,11 @@
-version: '3.8'
-
 services:
   backend:
     build: ./backend
     ports:
       - '8081:8080'
     restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
 
   frontend:
     build: ./frontend
@@ -14,3 +14,5 @@ services:
     depends_on:
       - backend
     restart: unless-stopped 
+    mem_limit: 512m
+    cpus: 0.5
